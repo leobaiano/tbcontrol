@@ -17,6 +17,7 @@ class SellerReportPage extends StatelessWidget {
   }
 
   Future<List<Map<String, dynamic>>> _initializeData() async {
+    print(await _getTransactions(sellerData['_id']));
     return await _getTransactions(sellerData['_id']);
   }
 
@@ -30,8 +31,21 @@ class SellerReportPage extends StatelessWidget {
         } else if (snapshot.hasError) {
           return Text('Erro: ${snapshot.error}');
         } else {
-          double totalDeliveries = snapshot.data!
-              .fold(0, (sum, delivery) => sum + delivery['value']);
+          double totalDeliveries = snapshot.data!.fold(0, (sum, delivery) {
+            var amount = delivery['amount'];
+            if (amount != null) {
+              if (amount is num) {
+                return sum + amount;
+              } else if (amount is String) {
+                var parsedAmount = double.tryParse(amount);
+                return sum + (parsedAmount ?? 0);
+              } else {
+                return sum;
+              }
+            } else {
+              return sum;
+            }
+          });
 
           double totalPayments =
               payments.fold(0, (sum, payment) => sum + payment['value']);
@@ -99,10 +113,12 @@ class SellerReportPage extends StatelessWidget {
   }
 
   Widget _buildDataTable(List<Map<String, dynamic>> deliveries) {
+    double totalAmount = 0;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columnSpacing: 30,
+        columnSpacing: 20,
         columns: const [
           DataColumn(
             label: SizedBox(
@@ -126,6 +142,8 @@ class SellerReportPage extends StatelessWidget {
           ),
         ],
         rows: deliveries.map((entry) {
+          totalAmount += entry['amount'] ?? 0;
+
           return DataRow(
             cells: [
               DataCell(_buildCellText(
@@ -133,14 +151,34 @@ class SellerReportPage extends StatelessWidget {
               DataCell(_buildCellText(entry['product'].toString())),
               DataCell(_buildCellText(entry['quantity'].toString())),
               DataCell(_buildCellText(
-                NumberFormat.currency(
-                  locale: 'pt_BR',
-                  symbol: 'R\$',
-                ).format(entry['value']),
+                entry['amount'] != null
+                    ? NumberFormat.currency(
+                        locale: 'pt_BR',
+                        symbol: 'R\$',
+                      ).format(entry['amount'])
+                    : 'N/A', // Ou qualquer valor padrão que você deseja exibir para nulo
               )),
             ],
           );
-        }).toList(),
+        }).toList()
+          ..add(DataRow(
+            cells: [
+              const DataCell(Text(
+                'Total:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              )),
+              DataCell(SizedBox.shrink()),
+              DataCell(SizedBox.shrink()),
+              DataCell(
+                Text(
+                    NumberFormat.currency(
+                      locale: 'pt_BR',
+                      symbol: 'R\$',
+                    ).format(totalAmount),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          )),
       ),
     );
   }
@@ -178,7 +216,7 @@ class SellerReportPage extends StatelessWidget {
             'date': transaction['created_at'],
             'product': productName,
             'quantity': transaction['quantity'],
-            'value': transaction['value'],
+            'amount': transaction['amount'],
           };
 
           formattedTransactions.add(formattedTransaction);
