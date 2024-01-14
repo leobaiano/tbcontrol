@@ -108,11 +108,15 @@ class _SellersPageState extends State<SellersPage> {
   }
 
   Future<void> _viewSeller(int index) async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SellerReportPage(sellerData: sellers[index]),
-      ),
-    );
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SellerReportPage(sellerData: sellers[index]),
+        ),
+      );
+    } catch (e) {
+      print('Erro ao abrir a página do relatório: $e');
+    }
   }
 }

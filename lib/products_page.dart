@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo_dart;
 import 'package:tbcontrol/custom_drawer.dart';
+import 'package:tbcontrol/seller_data.dart';
 import 'mongo_db_service.dart';
 import 'package:tbcontrol/user_data.dart';
 
@@ -217,8 +218,7 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Future<void> _enviarProduto(int index) async {
     TextEditingController quantidadeController = TextEditingController();
-    String? vendedorSelecionado;
-
+    mongo_dart.ObjectId? vendedorSelecionado;
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
@@ -236,23 +236,24 @@ class _ProductsPageState extends State<ProductsPage> {
             content: SingleChildScrollView(
               child: Column(
                 children: [
-                  DropdownButtonFormField<String>(
+                  DropdownButtonFormField<mongo_dart.ObjectId>(
                     value: vendedorSelecionado,
-                    onChanged: (value) {
+                    onChanged: (mongo_dart.ObjectId? value) {
                       setState(() {
                         vendedorSelecionado = value;
                       });
                     },
                     items: vendedores
-                        .map<DropdownMenuItem<String>>(
-                          (vendedor) => DropdownMenuItem<String>(
-                            value: vendedor['user'] as String,
+                        .map<DropdownMenuItem<mongo_dart.ObjectId>>(
+                          (vendedor) => DropdownMenuItem<mongo_dart.ObjectId>(
+                            value: vendedor['_id'],
                             child: Text(vendedor['name'] as String),
                           ),
                         )
                         .toList(),
                     decoration: const InputDecoration(
-                        labelText: 'Selecione o Vendedor'),
+                      labelText: 'Selecione o Vendedor',
+                    ),
                   ),
                   TextFormField(
                     controller: quantidadeController,
@@ -295,19 +296,38 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _enviarProdutoParaVendedor(
-      int index, String? vendedor, String quantidade) async {
+      int index, mongo_dart.ObjectId? vendedorId, String quantidade) async {
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
 
       var produtosCollection = db.collection('products');
       var transactionsCollection = db.collection('transactions');
+      // var vendedoresCollection = db.collection('users');
 
       var quantidadeAtual = produtos[index]['quantity'];
       var quantidadeEnviada = int.tryParse(quantidade);
 
+      var produtoSelecionado = await produtosCollection
+          .findOne(mongo_dart.where.id(produtos[index]['_id']));
+
+      double total = 0;
+      if (produtoSelecionado != null) {
+        total = (quantidadeEnviada! * produtoSelecionado['value'] as double);
+      }
+
       if (quantidadeEnviada != null && quantidadeAtual >= quantidadeEnviada) {
-        // await transactionsCollection.insertOne({});
+        // var vendedor = await vendedoresCollection.findOne(
+        //   mongo_dart.where.id(vendedorId!),
+        // );
+
+        await transactionsCollection.insertOne({
+          'user_id': vendedorId,
+          'product_id': produtos[index]['_id'],
+          'quantity': quantidadeEnviada,
+          'value': total,
+          'created_at': DateTime.now().toLocal(),
+        });
 
         await produtosCollection.update(
           mongo_dart.where.eq('_id', produtos[index]['_id']),
