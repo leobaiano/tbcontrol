@@ -325,8 +325,9 @@ class _ProductsPageState extends State<ProductsPage> {
           'user_id': vendedorId,
           'product_id': produtos[index]['_id'],
           'quantity': quantidadeEnviada,
-          'amount': total,
           'unit_value': produtoSelecionado?['value'],
+          'amount': total,
+          'type': 'Entrega',
           'created_at': DateTime.now().toLocal(),
         });
 

@@ -5,51 +5,56 @@ import 'mongo_db_service.dart';
 
 class SellerReportPage extends StatelessWidget {
   final Map<String, dynamic> sellerData;
-  late final Future<List<Map<String, dynamic>>> deliveries;
-
-  final List<Map<String, dynamic>> payments = [
-    {'date': '2022-01-02', 'value': 40.0},
-    {'date': '2022-01-06', 'value': 20.0},
-  ];
+  late final Future<List<Map<String, dynamic>>> withdrawals;
+  late final Future<List<Map<String, dynamic>>> sales;
 
   SellerReportPage({Key? key, required this.sellerData}) : super(key: key) {
-    deliveries = _initializeData();
+    withdrawals = _initializeData('Entrega');
+    sales = _initializeData('Venda');
   }
 
-  Future<List<Map<String, dynamic>>> _initializeData() async {
-    return await _getTransactions(sellerData['_id']);
+  Future<List<Map<String, dynamic>>> _initializeData(type) async {
+    if (type == 'Entrega') {
+      return await _getWithdrawals(sellerData['_id']);
+    } else if (type == 'Venda') {
+      return await _getSales(sellerData['_id']);
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> _getWithdrawals(sellerId) async {
+    return await _getTransactions(sellerId, 'Entrega');
+  }
+
+  Future<List<Map<String, dynamic>>> _getSales(sellerId) async {
+    return await _getTransactions(sellerId, 'Venda');
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: deliveries,
-      builder: (context, snapshot) {
+    return FutureBuilder(
+      future: Future.wait([withdrawals, sales]),
+      builder:
+          (context, AsyncSnapshot<List<List<Map<String, dynamic>>>> snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const CircularProgressIndicator();
         } else if (snapshot.hasError) {
           return Text('Erro: ${snapshot.error}');
         } else {
-          double totalDeliveries = snapshot.data!.fold(0, (sum, delivery) {
-            var amount = delivery['amount'];
-            if (amount != null) {
-              if (amount is num) {
-                return sum + amount;
-              } else if (amount is String) {
-                var parsedAmount = double.tryParse(amount);
-                return sum + (parsedAmount ?? 0);
-              } else {
-                return sum;
-              }
-            } else {
-              return sum;
-            }
+          List<Map<String, dynamic>> withdrawalsData = snapshot.data![0];
+          List<Map<String, dynamic>> salesData = snapshot.data![1];
+
+          double totalWithdrawals = withdrawalsData.fold(0, (sum, withdrawal) {
+            var amount = withdrawal['amount'];
+            return sum + (amount is num ? amount : 0);
           });
 
-          double totalPayments =
-              payments.fold(0, (sum, payment) => sum + payment['value']);
+          double totalSales = salesData.fold(0, (sum, sale) {
+            var amount = sale['amount'];
+            return sum + (amount is num ? amount : 0);
+          });
 
-          double totalDue = totalDeliveries - totalPayments;
+          double totalDue = totalWithdrawals - totalSales;
 
           TextStyle textStyleStatus;
           String statusDoDebito = 'Não está devendo nada.';
@@ -109,16 +114,16 @@ class SellerReportPage extends StatelessWidget {
                       fontSize: 18,
                     ),
                   ),
-                  _buildDataTable(snapshot.data!),
+                  _buildDataTable(withdrawalsData),
                   const SizedBox(height: 20),
                   const Text(
-                    'Pagamentos',
+                    'Vendas',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
                   ),
-                  _buildPaymentList(payments),
+                  _buildDataTable(salesData),
                 ],
               ),
             ),
@@ -128,7 +133,7 @@ class SellerReportPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDataTable(List<Map<String, dynamic>> deliveries) {
+  Widget _buildDataTable(List<Map<String, dynamic>> data) {
     double totalAmount = 0;
 
     return SingleChildScrollView(
@@ -157,7 +162,7 @@ class SellerReportPage extends StatelessWidget {
             ),
           ),
         ],
-        rows: deliveries.map((entry) {
+        rows: data.map((entry) {
           totalAmount += entry['amount'] ?? 0;
 
           return DataRow(
@@ -172,7 +177,7 @@ class SellerReportPage extends StatelessWidget {
                         locale: 'pt_BR',
                         symbol: 'R\$',
                       ).format(entry['amount'])
-                    : 'N/A', // Ou qualquer valor padrão que você deseja exibir para nulo
+                    : 'N/A',
               )),
             ],
           );
@@ -183,8 +188,8 @@ class SellerReportPage extends StatelessWidget {
                 'Total:',
                 style: TextStyle(fontWeight: FontWeight.bold),
               )),
-              DataCell(SizedBox.shrink()),
-              DataCell(SizedBox.shrink()),
+              const DataCell(SizedBox.shrink()),
+              const DataCell(SizedBox.shrink()),
               DataCell(
                 Text(
                     NumberFormat.currency(
@@ -210,7 +215,7 @@ class SellerReportPage extends StatelessWidget {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _getTransactions(sellerId) async {
+  Future<List<Map<String, dynamic>>> _getTransactions(sellerId, type) async {
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
@@ -218,9 +223,9 @@ class SellerReportPage extends StatelessWidget {
       var transactionsCollection = db.collection('transactions');
 
       var transactions = await transactionsCollection
-          .find(
-            mongo_dart.where.eq('user_id', sellerId),
-          )
+          .find(mongo_dart.where
+              .eq('user_id', sellerId)
+              .and(mongo_dart.where.eq('type', type)))
           .toList();
 
       List<Map<String, dynamic>> formattedTransactions = [];
@@ -268,75 +273,5 @@ class SellerReportPage extends StatelessWidget {
       print('Erro ao consultar o produto: $e');
       return '-';
     }
-  }
-
-  Widget _buildPaymentList(List<Map<String, dynamic>> payments) {
-    // Adiciona um elemento extra representando o total
-    List<Map<String, dynamic>> paymentsWithTotal = List.from(payments);
-
-    // Calcula o total
-    double total = payments.fold(0, (sum, payment) => sum + payment['value']);
-
-    // Adiciona o elemento do total à lista
-    paymentsWithTotal.add({'total': total});
-
-    return DataTable(
-      // columnSpacing: 30,
-      columns: const [
-        DataColumn(
-          label: SizedBox(
-            child: Text('Data'),
-          ),
-        ),
-        DataColumn(
-          label: SizedBox(
-            child: Text('Valor'),
-          ),
-        ),
-      ],
-      rows: paymentsWithTotal.map((entry) {
-        // Verifica se é o elemento do total
-        if (entry.containsKey('total')) {
-          return DataRow(
-            cells: [
-              DataCell(_buildCellTextPayments('Total de pagamentos',
-                  fontWeight: FontWeight.bold)),
-              DataCell(_buildCellTextPayments(
-                NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-                    .format(entry['total']),
-                fontWeight: FontWeight.bold,
-              )),
-            ],
-          );
-        } else {
-          // Elemento normal da lista de pagamentos
-          return DataRow(
-            cells: [
-              DataCell(_buildCellTextPayments(
-                DateFormat("dd/MM/yyyy").format(DateTime.parse(entry['date'])),
-                fontWeight: FontWeight.normal, // removido o negrito
-              )),
-              DataCell(_buildCellTextPayments(
-                NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-                    .format(entry['value']),
-                fontWeight: FontWeight.normal, // removido o negrito
-              )),
-            ],
-          );
-        }
-      }).toList(),
-    );
-  }
-
-  Widget _buildCellTextPayments(String text, {FontWeight? fontWeight}) {
-    return SizedBox(
-      width: double.infinity,
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontWeight: fontWeight ?? FontWeight.normal),
-      ),
-    );
   }
 }
