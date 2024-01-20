@@ -17,7 +17,6 @@ class SellerReportPage extends StatelessWidget {
   }
 
   Future<List<Map<String, dynamic>>> _initializeData() async {
-    print(await _getTransactions(sellerData['_id']));
     return await _getTransactions(sellerData['_id']);
   }
 
@@ -74,6 +73,14 @@ class SellerReportPage extends StatelessWidget {
           return Scaffold(
             appBar: AppBar(
               title: const Text('Relatório de vendas'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.paid),
+                  onPressed: () {
+                    // _addPayment(context);
+                  },
+                ),
+              ],
             ),
             body: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -103,6 +110,15 @@ class SellerReportPage extends StatelessWidget {
                     ),
                   ),
                   _buildDataTable(snapshot.data!),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Pagamentos',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  _buildPaymentList(payments),
                 ],
               ),
             ),
@@ -252,5 +268,75 @@ class SellerReportPage extends StatelessWidget {
       print('Erro ao consultar o produto: $e');
       return '-';
     }
+  }
+
+  Widget _buildPaymentList(List<Map<String, dynamic>> payments) {
+    // Adiciona um elemento extra representando o total
+    List<Map<String, dynamic>> paymentsWithTotal = List.from(payments);
+
+    // Calcula o total
+    double total = payments.fold(0, (sum, payment) => sum + payment['value']);
+
+    // Adiciona o elemento do total à lista
+    paymentsWithTotal.add({'total': total});
+
+    return DataTable(
+      // columnSpacing: 30,
+      columns: const [
+        DataColumn(
+          label: SizedBox(
+            child: Text('Data'),
+          ),
+        ),
+        DataColumn(
+          label: SizedBox(
+            child: Text('Valor'),
+          ),
+        ),
+      ],
+      rows: paymentsWithTotal.map((entry) {
+        // Verifica se é o elemento do total
+        if (entry.containsKey('total')) {
+          return DataRow(
+            cells: [
+              DataCell(_buildCellTextPayments('Total de pagamentos',
+                  fontWeight: FontWeight.bold)),
+              DataCell(_buildCellTextPayments(
+                NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                    .format(entry['total']),
+                fontWeight: FontWeight.bold,
+              )),
+            ],
+          );
+        } else {
+          // Elemento normal da lista de pagamentos
+          return DataRow(
+            cells: [
+              DataCell(_buildCellTextPayments(
+                DateFormat("dd/MM/yyyy").format(DateTime.parse(entry['date'])),
+                fontWeight: FontWeight.normal, // removido o negrito
+              )),
+              DataCell(_buildCellTextPayments(
+                NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                    .format(entry['value']),
+                fontWeight: FontWeight.normal, // removido o negrito
+              )),
+            ],
+          );
+        }
+      }).toList(),
+    );
+  }
+
+  Widget _buildCellTextPayments(String text, {FontWeight? fontWeight}) {
+    return SizedBox(
+      width: double.infinity,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontWeight: fontWeight ?? FontWeight.normal),
+      ),
+    );
   }
 }
