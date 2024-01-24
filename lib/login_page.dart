@@ -20,84 +20,87 @@ class LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Faça login'),
-      ),
-      body: Center(
-        child: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.7,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextField(
-                controller: _usuarioController,
-                decoration: const InputDecoration(labelText: 'Usuário'),
-              ),
-              TextField(
-                controller: _senhaController,
-                decoration: const InputDecoration(labelText: 'Senha'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  String usuario = _usuarioController.text;
-                  String senha = _senhaController.text;
-
-                  DBConnection dbConnection = DBConnection.getInstance();
-                  mongo_dart.Db db;
-
-                  try {
-                    await dbConnection.initialize();
-                    db = await dbConnection.getConnection();
-                  } catch (e) {
-                    print("Erro ao obter conexão: $e");
-                    return;
-                  }
-
-                  var collection = db.collection('users');
-
-                  var result = await collection.findOne({
-                    'user': usuario,
-                    'password': senha,
-                  });
-
-                  if (result != null) {
-                    // Usuário encontrado, criar instância de UserData
-                    UserData userData = UserData(
-                      usuario: usuario,
-                      nome: result['name'],
-                      cargo: result['role'],
-                    );
-
-                    // Navegar para a página inicial (home_page.dart) com UserData
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HomePage(userData: userData),
-                      ),
-                    );
-                  } else {
-                    // Usuário não encontrado
-                    Fluttertoast.showToast(
-                      msg: "Usuário não encontrado",
-                      toastLength: Toast.LENGTH_SHORT,
-                      gravity: ToastGravity.BOTTOM,
-                      timeInSecForIosWeb: 1,
-                      backgroundColor: Colors.red,
-                      textColor: Colors.white,
-                      fontSize: 16.0,
-                    );
-                  }
-                },
-                child: const Text('Entrar'),
-              ),
-            ],
+    return WillPopScope(
+        onWillPop: () async => false,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Faça login'),
           ),
-        ),
-      ),
-    );
+          body: Center(
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.7,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextField(
+                    controller: _usuarioController,
+                    decoration: const InputDecoration(labelText: 'Usuário'),
+                  ),
+                  TextField(
+                    controller: _senhaController,
+                    decoration: const InputDecoration(labelText: 'Senha'),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () async {
+                      String usuario = _usuarioController.text;
+                      String senha = _senhaController.text;
+
+                      DBConnection dbConnection = DBConnection.getInstance();
+                      mongo_dart.Db db;
+
+                      try {
+                        await dbConnection.initialize();
+                        db = await dbConnection.getConnection();
+                      } catch (e) {
+                        print("Erro ao obter conexão: $e");
+                        return;
+                      }
+
+                      var collection = db.collection('users');
+
+                      var result = await collection.findOne({
+                        'user': usuario,
+                        'password': senha,
+                      });
+
+                      if (result != null) {
+                        // Usuário encontrado, criar instância de UserData
+                        UserData userData = UserData(
+                          id: result['_id'],
+                          usuario: usuario,
+                          nome: result['name'],
+                          cargo: result['role'],
+                        );
+
+                        // Navegar para a página inicial (home_page.dart) com UserData
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HomePage(userData: userData),
+                          ),
+                        );
+                      } else {
+                        // Usuário não encontrado
+                        Fluttertoast.showToast(
+                          msg: "Usuário não encontrado",
+                          toastLength: Toast.LENGTH_SHORT,
+                          gravity: ToastGravity.BOTTOM,
+                          timeInSecForIosWeb: 1,
+                          backgroundColor: Colors.red,
+                          textColor: Colors.white,
+                          fontSize: 16.0,
+                        );
+                      }
+                    },
+                    child: const Text('Entrar'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ));
   }
 
   @override

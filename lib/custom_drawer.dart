@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:tbcontrol/login_page.dart';
 import 'package:tbcontrol/products_page.dart';
 import 'package:tbcontrol/sellers_page.dart';
 import 'package:tbcontrol/user_data.dart';
 import 'home_page.dart';
 import 'users_page.dart';
+import 'seller_page.dart';
 
 class CustomDrawer extends StatelessWidget {
   final UserData userData;
@@ -101,7 +103,37 @@ class CustomDrawer extends StatelessWidget {
       // Adicione outros itens específicos para 'Administrador' aqui, se necessário
     }
 
-    // Adicione itens específicos para outras roles aqui, se necessário
+    if (userData.cargo == 'Vendedor') {
+      roleBasedMenuItems.add(
+        ListTile(
+          title: const Text('Vender'),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SellerPage(userData: userData),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    roleBasedMenuItems.add(
+      ListTile(
+        title: const Text('Sair'),
+        onTap: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LoginPage(),
+            ),
+            (route) => false,
+          );
+        },
+      ),
+    );
 
     return roleBasedMenuItems;
   }
