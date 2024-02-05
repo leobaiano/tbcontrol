@@ -3,33 +3,21 @@ import 'package:intl/intl.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo_dart;
 import 'mongo_db_service.dart';
 
-class SellerReportPage extends StatefulWidget {
+class SellerReportPage extends StatelessWidget {
   final Map<String, dynamic> sellerData;
-
-  SellerReportPage({Key? key, required this.sellerData}) : super(key: key);
-
-  @override
-  _SellerReportPageState createState() => _SellerReportPageState();
-}
-
-class _SellerReportPageState extends State<SellerReportPage> {
-  late DateTime startDate = DateTime.now();
-  late DateTime endDate = DateTime.now();
   late final Future<List<Map<String, dynamic>>> withdrawals;
   late final Future<List<Map<String, dynamic>>> sales;
 
-  @override
-  void initState() {
-    super.initState();
+  SellerReportPage({Key? key, required this.sellerData}) : super(key: key) {
     withdrawals = _initializeData('Entrega');
     sales = _initializeData('Venda');
   }
 
   Future<List<Map<String, dynamic>>> _initializeData(type) async {
     if (type == 'Entrega') {
-      return await _getWithdrawals(widget.sellerData['_id']);
+      return await _getWithdrawals(sellerData['_id']);
     } else if (type == 'Venda') {
-      return await _getSales(widget.sellerData['_id']);
+      return await _getSales(sellerData['_id']);
     }
     return [];
   }
@@ -105,89 +93,29 @@ class _SellerReportPageState extends State<SellerReportPage> {
                 children: [
                   Center(
                     child: Text(
-                      widget.sellerData['name'],
+                      sellerData['name'],
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 26,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    statusDoDebito,
+                    style: textStyleStatus,
+                  ),
+                  const Divider(thickness: 2),
+                  const SizedBox(height: 16),
                   const Text(
-                    'Filtrar por Período:',
+                    'Entregas',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
                   ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          readOnly: true,
-                          controller: TextEditingController(
-                            text: startDate != null
-                                ? DateFormat('dd/MM/yyyy').format(startDate!)
-                                : '',
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Início',
-                          ),
-                          onTap: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: startDate ?? DateTime.now(),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2101),
-                            );
-
-                            if (pickedDate != null) {
-                              setState(() {
-                                startDate = pickedDate;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: TextFormField(
-                          readOnly: true,
-                          controller: TextEditingController(
-                            text: endDate != null
-                                ? DateFormat('dd/MM/yyyy').format(endDate!)
-                                : '',
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Fim',
-                          ),
-                          onTap: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: startDate ?? DateTime.now(),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2101),
-                            );
-
-                            if (pickedDate != null) {
-                              setState(() {
-                                endDate = pickedDate;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Adicione aqui a lógica para filtrar por período
-                          // utilizando as variáveis startDate e endDate
-                        },
-                        child: const Text('Filtrar'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
+                  _buildDataTable(withdrawalsData),
+                  const SizedBox(height: 20),
                   const Text(
                     'Vendas',
                     style: TextStyle(

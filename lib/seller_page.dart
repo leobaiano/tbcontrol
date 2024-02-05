@@ -8,6 +8,8 @@ import 'package:tbcontrol/custom_drawer.dart';
 import 'mongo_db_service.dart';
 import 'package:tbcontrol/user_data.dart';
 
+import 'seller_report_page.dart';
+
 class SellerPage extends StatefulWidget {
   final UserData userData;
 
@@ -19,12 +21,14 @@ class SellerPage extends StatefulWidget {
 
 class _SellerPageState extends State<SellerPage> {
   List<Map<String, dynamic>> produtos = []; // Lista para armazenar os produtos
+  double saldo = 0;
 
   @override
   void initState() {
     super.initState();
 
     _carregarProdutos(widget.userData.id);
+    _calcularSaldo(widget.userData.id);
   }
 
   @override
@@ -32,14 +36,7 @@ class _SellerPageState extends State<SellerPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Produtos'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              // _showAddProductDialog(context);
-            },
-          ),
-        ],
+        actions: [],
       ),
       drawer: CustomDrawer(
         userData: widget.userData,
@@ -54,6 +51,51 @@ class _SellerPageState extends State<SellerPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            InkWell(
+              onTap: () {
+                // Adicione a lógica da função que você deseja chamar aqui
+                _abrirRelatorio();
+              },
+              child: Container(
+                width: 100,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.rectangle,
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.attach_money,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '$saldo saldo do dia', // Substitua pelo valor real
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              alignment: Alignment.center,
+              child: const Text(
+                'Produtos',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Expanded(
               child: ListView.builder(
                 itemCount: produtos.length,
@@ -77,7 +119,7 @@ class _SellerPageState extends State<SellerPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${produtos[index]['quantity']} Itens no valor de R\$ ${produtos[index]['value']} cada.',
+                                  '${produtos[index]['quantity'].toInt()} Itens no valor de R\$ ${produtos[index]['value']} cada.',
                                   style: const TextStyle(
                                     color: Colors.grey,
                                   ),
@@ -88,10 +130,11 @@ class _SellerPageState extends State<SellerPage> {
                           Row(
                             children: [
                               IconButton(
-                                  icon: const Icon(Icons.send),
-                                  onPressed: () {
-                                    _venderProduto(index, widget.userData.id);
-                                  })
+                                icon: const Icon(Icons.send),
+                                onPressed: () {
+                                  _venderProduto(index, widget.userData.id);
+                                },
+                              ),
                             ],
                           ),
                         ],
@@ -107,6 +150,41 @@ class _SellerPageState extends State<SellerPage> {
     );
   }
 
+  Future<void> _calcularSaldo(mongo_dart.ObjectId sellerId) async {
+    try {
+      DBConnection dbConnection = DBConnection.getInstance();
+      mongo_dart.Db db = await dbConnection.getConnection();
+
+      var transactionsCollection = db.collection('transactions');
+
+      double total = 0;
+
+      DateTime hoje = DateTime.now();
+      DateTime inicioDoDia = DateTime(hoje.year, hoje.month, hoje.day);
+      DateTime finalDoDia = inicioDoDia
+          .add(const Duration(days: 1))
+          .subtract(const Duration(milliseconds: 1));
+
+      var vendas = await transactionsCollection
+          .find(mongo_dart.where
+              .eq('user_id', sellerId)
+              .and(mongo_dart.where.eq('type', 'Venda'))
+              .and(mongo_dart.where.gte('created_at', inicioDoDia))
+              .and(mongo_dart.where.lte('created_at', finalDoDia)))
+          .toList();
+
+      for (var venda in vendas) {
+        total += venda['amount'];
+      }
+
+      setState(() {
+        saldo = total;
+      });
+    } catch (e) {
+      print('Erro ao carregar saldo: $e');
+    }
+  }
+
   Future<void> _carregarProdutos(mongo_dart.ObjectId sellerId) async {
     try {
       var entregas = await _entregas(sellerId);
@@ -116,7 +194,7 @@ class _SellerPageState extends State<SellerPage> {
       int totalVendas = vendas.length;
 
       List<Map<String, dynamic>> produtosDisponiveis = [];
-      if (totalEntregas > totalVendas) {
+      if (totalEntregas >= totalVendas) {
         for (var itemEntrega in entregas) {
           var vendaCorrespondente = vendas.firstWhere(
               (itemVenda) =>
@@ -150,11 +228,20 @@ class _SellerPageState extends State<SellerPage> {
               orElse: () => {});
 
           if (entregaCorrespondente.isNotEmpty) {
-            itemVenda['amount'] =
-                (itemVenda['amount'] ?? 0) - entregaCorrespondente['amount'];
+            double amountEntrega =
+                double.parse((itemVenda['amount'] ?? 0).toString());
+            double quantityEntrega =
+                double.parse((itemVenda['quantity'] ?? 0).toString());
 
-            itemVenda['quantity'] = (itemVenda['quantity'] ?? 0) -
-                entregaCorrespondente['quantity'];
+            double amountVenda =
+                double.parse((entregaCorrespondente['amount'] ?? 0).toString());
+            double quantityVenda = double.parse(
+                (entregaCorrespondente['quantity'] ?? 0).toString());
+
+            itemVenda['amount'] = amountEntrega - amountVenda;
+
+            itemVenda['quantity'] = quantityEntrega - quantityVenda;
+
             produtosDisponiveis.add(Map<String, dynamic>.from(itemVenda));
           } else {
             produtosDisponiveis.add(Map<String, dynamic>.from(itemVenda));
@@ -240,12 +327,10 @@ class _SellerPageState extends State<SellerPage> {
 
       double total = quantidadeDouble * produtoValue;
 
-      print(produtos[index]);
-
       await transactionsCollection.insertOne({
         'user_id': vendedorId,
         'product_id': produtos[index]['_id'],
-        'quantity': quantidade,
+        'quantity': int.parse(quantidade),
         'unit_value': produtos[index]['value'],
         'amount': total,
         'type': 'Venda',
@@ -265,6 +350,7 @@ class _SellerPageState extends State<SellerPage> {
       await Future.delayed(const Duration(milliseconds: 500));
 
       await _carregarProdutos(vendedorId);
+      await _calcularSaldo(vendedorId);
     } catch (e) {
       print('Erro ao enviar produto: $e');
     }
@@ -372,5 +458,23 @@ class _SellerPageState extends State<SellerPage> {
     }
 
     return entregasUnicas;
+  }
+
+  Future<void> _abrirRelatorio() async {
+    Map<String, dynamic> seller = {
+      '_id': widget.userData.id,
+      'name': widget.userData.nome,
+      'role': widget.userData.cargo
+    };
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SellerReportPage(sellerData: seller),
+        ),
+      );
+    } catch (e) {
+      print('Erro ao abrir a página do relatório: $e');
+    }
   }
 }
