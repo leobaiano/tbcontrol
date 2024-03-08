@@ -17,6 +17,7 @@ class _SellerReportPageState extends State<SellerReportPage> {
   late DateTime endDate = DateTime.now();
   late final Future<List<Map<String, dynamic>>> withdrawals;
   late final Future<List<Map<String, dynamic>>> sales;
+  late List<Map<String, dynamic>> salesData;
 
   @override
   void initState() {
@@ -24,6 +25,9 @@ class _SellerReportPageState extends State<SellerReportPage> {
     withdrawals = _initializeData('Entrega');
     sales = _initializeData('Venda');
   }
+
+  late DateTime startDateDefault = DateTime.now();
+  late DateTime endDateDefault = DateTime.now();
 
   Future<List<Map<String, dynamic>>> _initializeData(type) async {
     if (type == 'Entrega') {
@@ -35,11 +39,13 @@ class _SellerReportPageState extends State<SellerReportPage> {
   }
 
   Future<List<Map<String, dynamic>>> _getWithdrawals(sellerId) async {
-    return await _getTransactions(sellerId, 'Entrega');
+    return await _getTransactions(
+        sellerId, 'Entrega', startDateDefault, endDateDefault);
   }
 
   Future<List<Map<String, dynamic>>> _getSales(sellerId) async {
-    return await _getTransactions(sellerId, 'Venda');
+    return await _getTransactions(
+        sellerId, 'Venda', startDateDefault, endDateDefault);
   }
 
   @override
@@ -180,8 +186,7 @@ class _SellerReportPageState extends State<SellerReportPage> {
                       const SizedBox(width: 16),
                       ElevatedButton(
                         onPressed: () {
-                          // Adicione aqui a lógica para filtrar por período
-                          // utilizando as variáveis startDate e endDate
+                          _filterTransactions();
                         },
                         child: const Text('Filtrar'),
                       ),
@@ -287,18 +292,30 @@ class _SellerReportPageState extends State<SellerReportPage> {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _getTransactions(sellerId, type) async {
+  Future<List<Map<String, dynamic>>> _getTransactions(
+      mongo_dart.ObjectId sellerId,
+      type,
+      DateTime startDate,
+      DateTime endDate) async {
+    print(startDate);
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
 
       var transactionsCollection = db.collection('transactions');
 
+      DateTime hoje = DateTime.now();
+      DateTime inicioDoDia = DateTime(hoje.year, hoje.month, hoje.day);
+      DateTime finalDoDia = inicioDoDia;
       var transactions = await transactionsCollection
           .find(mongo_dart.where
               .eq('user_id', sellerId)
-              .and(mongo_dart.where.eq('type', type)))
+              .and(mongo_dart.where.eq('type', 'Venda'))
+              .and(mongo_dart.where.gte('created_at', inicioDoDia))
+              .and(mongo_dart.where.lte('created_at', finalDoDia)))
           .toList();
+
+      print(transactions);
 
       List<Map<String, dynamic>> formattedTransactions = [];
 
@@ -344,6 +361,27 @@ class _SellerReportPageState extends State<SellerReportPage> {
     } catch (e) {
       print('Erro ao consultar o produto: $e');
       return '-';
+    }
+  }
+
+  void _filterTransactions() async {
+    mongo_dart.ObjectId sellerId = widget.sellerData['_id'];
+    String type = 'Venda';
+
+    try {
+      List<Map<String, dynamic>> filteredSales = await _getTransactions(
+        sellerId,
+        type,
+        startDate,
+        endDate,
+      );
+
+      // Atualiza o estado com os dados filtrados
+      setState(() {
+        salesData = filteredSales;
+      });
+    } catch (e) {
+      print('Erro ao filtrar transações: $e');
     }
   }
 }
