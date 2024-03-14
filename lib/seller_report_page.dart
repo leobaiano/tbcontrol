@@ -297,25 +297,19 @@ class _SellerReportPageState extends State<SellerReportPage> {
       type,
       DateTime startDate,
       DateTime endDate) async {
-    print(startDate);
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
 
       var transactionsCollection = db.collection('transactions');
 
-      DateTime hoje = DateTime.now();
-      DateTime inicioDoDia = DateTime(hoje.year, hoje.month, hoje.day);
-      DateTime finalDoDia = inicioDoDia;
       var transactions = await transactionsCollection
           .find(mongo_dart.where
               .eq('user_id', sellerId)
               .and(mongo_dart.where.eq('type', 'Venda'))
-              .and(mongo_dart.where.gte('created_at', inicioDoDia))
-              .and(mongo_dart.where.lte('created_at', finalDoDia)))
+              .and(mongo_dart.where.gte('created_at', startDate))
+              .and(mongo_dart.where.lte('created_at', endDate)))
           .toList();
-
-      print(transactions);
 
       List<Map<String, dynamic>> formattedTransactions = [];
 
