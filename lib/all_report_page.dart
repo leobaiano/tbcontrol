@@ -3,16 +3,16 @@ import 'package:intl/intl.dart';
 import 'package:mongo_dart/mongo_dart.dart' as mongo_dart;
 import 'mongo_db_service.dart';
 
-class SellerReportPage extends StatefulWidget {
+class AllReportPage extends StatefulWidget {
   final Map<String, dynamic> sellerData;
 
-  SellerReportPage({Key? key, required this.sellerData}) : super(key: key);
+  AllReportPage({Key? key, required this.sellerData}) : super(key: key);
 
   @override
   _SellerReportPageState createState() => _SellerReportPageState();
 }
 
-class _SellerReportPageState extends State<SellerReportPage> {
+class _SellerReportPageState extends State<AllReportPage> {
   late DateTime startDate = DateTime.now();
   late DateTime endDate = DateTime.now();
   late List<Map<String, dynamic>> salesData = [];
@@ -225,7 +225,6 @@ class _SellerReportPageState extends State<SellerReportPage> {
       String type = 'Venda';
 
       List<Map<String, dynamic>> filteredSales = await _getTransactions(
-        sellerId,
         type,
         startDate,
         endDate,
@@ -240,10 +239,7 @@ class _SellerReportPageState extends State<SellerReportPage> {
   }
 
   Future<List<Map<String, dynamic>>> _getTransactions(
-      mongo_dart.ObjectId sellerId,
-      type,
-      DateTime startDate,
-      DateTime endDate) async {
+      type, DateTime startDate, DateTime endDate) async {
     try {
       DBConnection dbConnection = DBConnection.getInstance();
       mongo_dart.Db db = await dbConnection.getConnection();
@@ -252,8 +248,7 @@ class _SellerReportPageState extends State<SellerReportPage> {
 
       var transactions = await transactionsCollection
           .find(mongo_dart.where
-              .eq('user_id', sellerId)
-              .and(mongo_dart.where.eq('type', 'Venda'))
+              .eq('type', 'Venda')
               .and(mongo_dart.where.gte('created_at', startDate))
               .and(mongo_dart.where.lte('created_at', endDate)))
           .toList();
